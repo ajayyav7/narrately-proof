@@ -71,7 +71,9 @@ export default function Dashboard() {
     try {
       const {data:{session}} = await createClient().auth.getSession();
       if (!session?.access_token) throw new Error("Your Narrately session expired. Please sign in again.");
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/analyses`, { method:"POST", headers:{Authorization:`Bearer ${session.access_token}`}, body:data });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiUrl) throw new Error("The Proof verification service is not connected yet. Your account and password reset pages are available while we finish setting it up.");
+      const response = await fetch(`${apiUrl}/api/v1/analyses`, { method:"POST", headers:{Authorization:`Bearer ${session.access_token}`}, body:data });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "Analysis could not be completed.");
       setLedger(result);
