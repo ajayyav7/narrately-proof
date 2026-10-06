@@ -87,8 +87,8 @@ export default function Dashboard() {
   if (accessLoading) return <main className="auth-screen"><div className="auth-card"><p>Checking your Narrately Proof access…</p></div></main>;
   if (!proofPlan) return <main className="auth-screen"><div className="auth-card">
     <div className="auth-brand"><span className="brand-mark"><ShieldCheck size={18}/></span>narrately<span>proof</span></div>
-    <h1>Proof is a separate product</h1>
-    <p>Your Narrately account is recognized, but access to Summary, Research, and Proof is managed separately. Start the Proof free plan to use this workspace.</p>
+    <h1>Choose your Proof plan</h1>
+    <p>Start the free Proof plan to continue.</p>
     <button className="button auth-submit" onClick={startFreePlan} disabled={activating}>{activating ? "Setting up…" : "Start Proof free plan"}</button>
     {accessError && <p className="auth-error" role="alert">{accessError}</p>}
     <button className="auth-switch" onClick={signOut}>Sign out</button>
