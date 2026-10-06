@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/proof";
   const code = request.nextUrl.searchParams.get("code");
-  const defaultNext = `${basePath}/`;
+  const defaultNext = basePath;
   const next = request.nextUrl.searchParams.get("next") || defaultNext;
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : defaultNext;
   const publicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
