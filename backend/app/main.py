@@ -9,7 +9,7 @@ from .verification import build_ledger
 app = FastAPI(title="Narrately Proof API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "https://getnarrately.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
