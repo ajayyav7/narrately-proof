@@ -4,8 +4,10 @@ import re
 from collections import Counter
 
 from .documents import Passage
+from .ollama_client import assess_claim_with_ollama
 
 STOP_WORDS = {"about", "after", "among", "because", "been", "being", "could", "during", "each", "from", "have", "into", "more", "most", "other", "over", "same", "such", "than", "that", "their", "there", "these", "they", "this", "those", "through", "under", "were", "which", "while", "with", "would", "will", "also", "both", "between", "companies", "company"}
+MAX_OLLAMA_ASSESSMENTS = 60
 
 
 def tokens(text: str) -> list[str]:
@@ -19,7 +21,7 @@ def percentages(text: str) -> list[float]:
     return found
 
 
-def verify_claim(claim: Passage, sources: list[tuple[str, list[Passage]]]) -> dict:
+def _rank_passages(claim: Passage, sources: list[tuple[str, list[Passage]]]) -> list[tuple[float, str, Passage]]:
     claim_tokens = set(tokens(claim.text))
     ranked = []
     for filename, passages in sources:
@@ -28,13 +30,15 @@ def verify_claim(claim: Passage, sources: list[tuple[str, list[Passage]]]) -> di
             if not claim_tokens or not source_tokens:
                 continue
             overlap = len(claim_tokens & source_tokens) / len(claim_tokens)
-            if overlap >= 0.25:
-                ranked.append((overlap, filename, passage))
-    ranked.sort(key=lambda entry: entry[0], reverse=True)
+            ranked.append((overlap, filename, passage))
+    return sorted(ranked, key=lambda entry: entry[0], reverse=True)
+
+
+def _deterministic_finding(claim: Passage, ranked: list[tuple[float, str, Passage]]) -> dict:
     evidence = []
     status = "unsupported"
     explanation = "No sufficiently similar passage was found in the supplied sources."
-    if ranked:
+    if ranked and ranked[0][0] >= 0.25:
         best_score, filename, passage = ranked[0]
         claim_nums, source_nums = percentages(claim.text), percentages(passage.text)
         evidence = [{"source": filename, "location": passage.location, "text": passage.text[:1200], "match_score": round(best_score, 3)}]
@@ -47,16 +51,64 @@ def verify_claim(claim: Passage, sources: list[tuple[str, list[Passage]]]) -> di
         else:
             status = "partially_supported"
             explanation = "A related passage was found, but it may not establish every part of the claim."
-        # Include close alternatives so conflicts are visible in the ledger.
         for score, alt_filename, alt in ranked[1:4]:
+            if score < 0.25:
+                continue
             evidence.append({"source": alt_filename, "location": alt.location, "text": alt.text[:1200], "match_score": round(score, 3)})
-    return {"claim": claim.text, "report_location": claim.location, "status": status, "explanation": explanation, "evidence": evidence}
+    return {"claim": claim.text, "report_location": claim.location, "status": status, "explanation": explanation, "evidence": evidence, "analysis_method": "deterministic_fallback"}
+
+
+def verify_claim(claim: Passage, sources: list[tuple[str, list[Passage]]], use_ollama: bool = True) -> dict:
+    ranked = _rank_passages(claim, sources)
+    fallback = _deterministic_finding(claim, ranked)
+    if not use_ollama or not ranked or ranked[0][0] < 0.12:
+        return fallback
+
+    candidates = [
+        {"id": index, "text": passage.text[:1600]}
+        for index, (_, _, passage) in enumerate(ranked[:4], start=1)
+    ]
+    assessment = assess_claim_with_ollama(claim.text, candidates)
+    if assessment is None:
+        return fallback
+
+    evidence = []
+    for evidence_id in assessment["evidence_ids"]:
+        _, filename, passage = ranked[evidence_id - 1]
+        evidence.append({
+            "source": filename,
+            "location": passage.location,
+            "text": passage.text[:1200],
+            "match_score": round(ranked[evidence_id - 1][0], 3),
+        })
+    status = assessment["status"]
+    if status != "unsupported" and not evidence:
+        status = "unsupported"
+        explanation = "The model did not select a source passage to support this finding."
+    else:
+        explanation = assessment["explanation"][:600]
+    return {
+        "claim": claim.text,
+        "report_location": claim.location,
+        "status": status,
+        "explanation": explanation,
+        "evidence": evidence,
+        "analysis_method": "ollama",
+    }
 
 
 def build_ledger(claims: list[Passage], sources: list[tuple[str, list[Passage]]]) -> dict:
-    findings = [verify_claim(claim, sources) for claim in claims]
+    findings = []
+    ollama_attempts = 0
+    for claim in claims:
+        ranked = _rank_passages(claim, sources)
+        should_assess = bool(ranked and ranked[0][0] >= 0.12 and ollama_attempts < MAX_OLLAMA_ASSESSMENTS)
+        if should_assess:
+            ollama_attempts += 1
+        findings.append(verify_claim(claim, sources, use_ollama=should_assess))
     counts = Counter(item["status"] for item in findings)
     total = len(findings)
+    methods = Counter(item["analysis_method"] for item in findings)
     return {
         "summary": {
             "total_claims": total,
@@ -65,7 +117,9 @@ def build_ledger(claims: list[Passage], sources: list[tuple[str, list[Passage]]]
             "unsupported": counts["unsupported"],
             "contradicted": counts["contradicted"],
             "support_rate": round(100 * counts["supported"] / total) if total else 0,
+            "ollama_assessed": methods["ollama"],
+            "deterministic_fallback": methods["deterministic_fallback"],
         },
         "findings": findings,
-        "notice": "Automated first-pass matching only. Findings require human review; text extraction and similarity are not proof of factual support.",
+        "notice": "Ollama compares report claims with retrieved source passages. Citations point to extracted source text. This is an AI-assisted first pass and requires human review; it does not establish factual truth.",
     }
