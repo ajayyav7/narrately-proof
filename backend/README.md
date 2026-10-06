@@ -68,3 +68,6 @@ After redeploy, open `https://getnarrately.com/proof` and try Start Verification
 Proof uses the existing Narrately Supabase project for Auth, Postgres, and Storage. FastAPI verifies the session and active Proof entitlement before accepting analysis. Proof metadata uses `proof_*` tables with row-level security; existing Auth users remain the source of identity. See `../supabase/README.md` before applying any migration. Never put a Supabase secret key in a `NEXT_PUBLIC_*` variable or commit it.
 
 FAISS CPU is the selected initial vector index. The official supported Windows install path is Conda; current Windows package builds are for Python 3.12, while this API environment uses Python 3.14. When vector search is implemented, create a Python 3.12 Conda environment for the worker and install the API requirements there too. Do not try to add `faiss-cpu` with pip to this environment.
+
+
+Before starting FastAPI, open the existing `backend/.env` and set `OLLAMA_MODEL=qwen3.5:2b-q4_K_M`; the `.env.example` file is only a template and does not overwrite your local `.env`. If using the smaller model, set the matching `qwen3.5:0.8b` value instead.
