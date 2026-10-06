@@ -14,8 +14,9 @@ export default function ForgotPasswordPage() {
   async function sendReset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(""); setMessage(""); setBusy(true);
     try {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/proof";
       const { error: resetError } = await createClient().auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+        redirectTo: `${window.location.origin}${basePath}/auth/callback?next=${encodeURIComponent(`${basePath}/reset-password`)}`,
       });
       if (resetError) throw resetError;
       setMessage("If an account exists for that email, a password reset link will be sent. Check your inbox and spam folder.");

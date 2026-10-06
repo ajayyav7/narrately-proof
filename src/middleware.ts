@@ -21,14 +21,16 @@ export async function middleware(request: NextRequest) {
   });
 
   const { data: { user } } = await supabase.auth.getUser();
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/proof";
   const path = request.nextUrl.pathname;
-  const authPage = path === "/login" || path === "/register" || path === "/forgot-password";
+  const appPath = path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
+  const authPage = appPath === "/login" || appPath === "/register" || appPath === "/forgot-password";
 
-  if (!user && !authPage && path !== "/auth/callback") {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (!user && !authPage && appPath !== "/auth/callback") {
+    return NextResponse.redirect(new URL(`${basePath}/login`, request.url));
   }
   if (user && authPage) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL(`${basePath}/`, request.url));
   }
   return response;
 }
