@@ -25,8 +25,9 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const appPath = path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
   const authPage = appPath === "/login" || appPath === "/register" || appPath === "/forgot-password";
+  const recoveryPage = appPath === "/reset-password";
 
-  if (!user && !authPage && appPath !== "/auth/callback") {
+  if (!user && !authPage && !recoveryPage && appPath !== "/auth/callback") {
     return NextResponse.redirect(new URL(`${basePath}/login`, request.url));
   }
   if (user && authPage) {
@@ -36,5 +37,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
