@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/auth-layout";
 import { createClient } from "@/lib/supabase/client";
 
+function getConfirmationRedirectUrl() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/proof";
+  return `${window.location.origin}${basePath}/auth/callback?next=${encodeURIComponent(`${basePath}/`)}`;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -20,15 +25,18 @@ export default function RegisterPage() {
     try {
       const { data, error: authError } = await createClient().auth.signUp({
         email: email.trim(), password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/` },
+        options: { emailRedirectTo: getConfirmationRedirectUrl() },
       });
       if (authError) throw authError;
       if (data.session) { router.replace("/"); router.refresh(); }
-      else { setConfirmationPending(true); setMessage(`If ${email.trim()} is eligible, Supabase will send a confirmation link. Open it to finish creating your account.`); }
+      else {
+        setConfirmationPending(true);
+        setMessage("Email confirmation verifies your address; it does not grant a subscription or product access. If you are creating a new account, check your inbox for the confirmation link. If you already have an account, sign in or reset your password.");
+      }
     } catch (cause) {
       const detail = cause instanceof Error ? cause.message : "Could not create the account.";
       setError(/email_address_not_authorized/i.test(detail)
-        ? "Supabase's default email sender can only deliver to project team addresses. Configure custom SMTP in Supabase before sending confirmation emails to other people."
+        ? "Email delivery is not configured for this address. Please contact support or try again later."
         : detail);
     }
     finally { setBusy(false); }
@@ -36,9 +44,13 @@ export default function RegisterPage() {
 
   async function resendConfirmation() {
     setError(""); setBusy(true);
-    const { error: resendError } = await createClient().auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/` } });
+    const { error: resendError } = await createClient().auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: { emailRedirectTo: getConfirmationRedirectUrl() },
+    });
     if (resendError) setError(resendError.message);
-    else setMessage(`If ${email.trim()} has an unconfirmed account, a new confirmation link will be sent.`);
+    else setMessage("If your account still needs email confirmation, a new link will be sent. The link returns you to Narrately Proof.");
     setBusy(false);
   }
 
