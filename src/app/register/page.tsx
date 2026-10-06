@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 function getConfirmationRedirectUrl() {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/proof";
-  return `${window.location.origin}${basePath}/auth/callback?next=${encodeURIComponent(`${basePath}/`)}`;
+  return `${window.location.origin}${basePath}/auth/callback?next=${encodeURIComponent(basePath)}`;
 }
 
 export default function RegisterPage() {
@@ -31,7 +31,7 @@ export default function RegisterPage() {
       if (data.session) { router.replace("/"); router.refresh(); }
       else {
         setConfirmationPending(true);
-        setMessage("Email confirmation verifies your address; it does not grant a subscription or product access. If you are creating a new account, check your inbox for the confirmation link. If you already have an account, sign in or reset your password.");
+        setMessage("If confirmation is needed, we’ll email you a link. Already have an account? Sign in or reset your password.");
       }
     } catch (cause) {
       const detail = cause instanceof Error ? cause.message : "Could not create the account.";
@@ -50,11 +50,11 @@ export default function RegisterPage() {
       options: { emailRedirectTo: getConfirmationRedirectUrl() },
     });
     if (resendError) setError(resendError.message);
-    else setMessage("If your account still needs email confirmation, a new link will be sent. The link returns you to Narrately Proof.");
+    else setMessage("If confirmation is still needed, check your email for a new link.");
     setBusy(false);
   }
 
-  return <AuthLayout title="Create your Narrately account" subtitle="Use the same account across Narrately products.">
+  return <AuthLayout title="Create your Narrately Proof account" subtitle="Sign up with your email and password.">
     <form className="auth-form" onSubmit={signUp}>
       <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event)=>setEmail(event.target.value)} placeholder="you@company.com"/></label>
       <label>Password<input type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event)=>setPassword(event.target.value)} placeholder="At least 8 characters"/></label>
@@ -63,6 +63,6 @@ export default function RegisterPage() {
       {confirmationPending && <button type="button" className="auth-switch" onClick={resendConfirmation} disabled={busy}>Resend confirmation email</button>}
       <button className="button auth-submit" disabled={busy}>{busy ? "Creating account…" : "Create account"}</button>
     </form>
-    <p className="auth-switch">Already have a Narrately account? <Link href="/login">Sign in</Link></p>
+    <p className="auth-switch">Already have an account? <Link href="/login">Sign in</Link></p>
   </AuthLayout>;
 }
