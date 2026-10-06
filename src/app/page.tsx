@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [toast, setToast] = useState("");
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("Verifying…");
   const reportInput = useRef<HTMLInputElement>(null);
   const sourceInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -68,19 +69,58 @@ export default function Dashboard() {
     if (!reportFiles.length || !sourceFiles.length) { notify("Add one report and at least one source document to continue."); return; }
     const data = new FormData(); data.append("report", reportFiles[0]); sourceFiles.forEach((file) => data.append("sources", file));
     setBusy(true);
+    setProgressMessage("Uploading files…");
     try {
       const {data:{session}} = await createClient().auth.getSession();
       if (!session?.access_token) throw new Error("Your Narrately session expired. Please sign in again.");
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       if (!apiUrl) throw new Error("The Proof verification service is not connected yet. Your account and password reset pages are available while we finish setting it up.");
       const response = await fetch(`${apiUrl}/api/v1/analyses`, { method:"POST", headers:{Authorization:`Bearer ${session.access_token}`}, body:data });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.detail || "Analysis could not be completed.");
+      const started = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(started.detail || "Analysis could not be started.");
+      if (!started.job_id) throw new Error("The verification service did not return an analysis job.");
+
+      let result: Ledger | null = null;
+      let consecutivePollFailures = 0;
+      while (!result) {
+        await new Promise((resolve) => window.setTimeout(resolve, 3000));
+        let pollResponse: Response;
+        try {
+          pollResponse = await fetch(`${apiUrl}/api/v1/analyses/${started.job_id}`, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+            cache: "no-store",
+          });
+        } catch {
+          consecutivePollFailures += 1;
+          if (consecutivePollFailures >= 20) {
+            throw new Error("The connection to the verification service was lost. Keep the API and tunnel running, then try again.");
+          }
+          setProgressMessage("Reconnecting to the verification service…");
+          continue;
+        }
+
+        const job = await pollResponse.json().catch(() => ({}));
+        if (pollResponse.status >= 500) {
+          consecutivePollFailures += 1;
+          if (consecutivePollFailures >= 20) {
+            throw new Error("The connection to the verification service was lost. Keep the API and tunnel running, then try again.");
+          }
+          setProgressMessage("Reconnecting to the verification service…");
+          continue;
+        }
+        if (!pollResponse.ok) throw new Error(job.detail || "Could not check analysis progress.");
+        consecutivePollFailures = 0;
+        if (job.status === "failed") throw new Error(job.error || "Analysis could not be completed.");
+        if (job.status === "completed" && job.result) result = job.result as Ledger;
+        else setProgressMessage(job.stage || "Verifying your report against the source documents…");
+      }
+      if (!result) throw new Error("The analysis finished without returning a result.");
+
       setLedger(result);
       setReports([{ name: reportFiles[0].name, date: "Just now", claims: result.summary.total_claims, score: `${result.summary.support_rate}%`, status: "Complete" }, ...reports]);
       setModal(false); setReportFiles([]); setSourceFiles([]);
     } catch (error) { notify(error instanceof Error ? error.message : "Could not reach the Narrately Proof API. Start the backend and try again."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setProgressMessage("Verifying…"); }
   };
   const downloadLedger = () => { if (!ledger) return; const blob = new Blob([JSON.stringify(ledger,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const anchor=document.createElement("a"); anchor.href=url; anchor.download=`${ledger.report?.filename?.replace(/\.[^.]+$/,"" ) || "narrately-proof"}-evidence-ledger.json`; anchor.click(); URL.revokeObjectURL(url); };
 
@@ -148,7 +188,7 @@ export default function Dashboard() {
       <input ref={sourceInput} hidden multiple type="file" accept=".pdf,.docx,.xlsx" onChange={(e) => addFiles(e.target.files,setSourceFiles,sourceFiles)}/>
       <Dropzone title="Choose source documents" hint="Add the documents that support the report’s claims" onClick={() => sourceInput.current?.click()}/>
       {sourceFiles.map((f,i)=><PickedFile key={`${f.name}-${i}`} file={f} onRemove={() => setSourceFiles(sourceFiles.filter((_,n)=>n!==i))}/>)}
-      <div className="modal-actions"><button className="button secondary" onClick={() => setModal(false)}>Cancel</button><button className="button" onClick={startAnalysis} disabled={busy}>{busy ? "Verifying…" : "Start verification"} <ArrowRight size={14}/></button></div>
+      <div className="modal-actions"><button className="button secondary" onClick={() => setModal(false)} disabled={busy}>Cancel</button><button className="button" onClick={startAnalysis} disabled={busy}>{busy ? progressMessage : "Start verification"} <ArrowRight size={14}/></button></div>
     </section></div>}
     {ledger && <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setLedger(null); }}><section className="modal result-modal" role="dialog" aria-modal="true" aria-labelledby="ledger-title">
       <div className="modal-head"><div><h2 id="ledger-title">Evidence ledger</h2><p className="modal-desc" style={{margin:"5px 0 0"}}>{ledger.report?.filename} · {ledger.sources?.length || 0} source documents</p></div><button className="close" onClick={() => setLedger(null)} aria-label="Close"><X size={18}/></button></div>
