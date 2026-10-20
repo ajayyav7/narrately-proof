@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { Activity, ArrowDownToLine, ArrowRight, Bell, BookOpenCheck, Check, CircleHelp, Clock3, FileCheck2, FileText, FolderClosed, Gauge, LayoutDashboard, LockKeyhole, LogOut, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, UploadCloud, X } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowRight, Bell, BookOpenCheck, Check, CircleHelp, Clock3, FileCheck2, FileText, FolderClosed, Gauge, LayoutDashboard, LockKeyhole, LogOut, MoreHorizontal, Plus, Search, Settings2, UploadCloud, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type Report = { name: string; date: string; claims: number; score: string; status: "Complete" | "Processing" };
@@ -126,7 +126,7 @@ export default function Dashboard() {
 
   if (accessLoading) return <main className="auth-screen"><div className="auth-card"><p>Checking your Narrately Proof access…</p></div></main>;
   if (!proofPlan) return <main className="auth-screen"><div className="auth-card">
-    <div className="auth-brand"><span className="brand-mark"><ShieldCheck size={18}/></span>narrately<span>proof</span></div>
+    <div className="auth-brand"><span className="brand-wordmark">Narrately</span><span className="brand-divider">/</span><span className="brand-product">Proof</span></div>
     <h1>Choose your Proof plan</h1>
     <p>Start the free Proof plan to continue.</p>
     <button className="button auth-submit" onClick={startFreePlan} disabled={activating}>{activating ? "Setting up…" : "Start Proof free plan"}</button>
@@ -136,7 +136,7 @@ export default function Dashboard() {
 
   return <div className="shell">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark"><ShieldCheck size={18}/></span>narrately<span style={{fontWeight:450,color:"#64748b"}}>proof</span></div>
+      <div className="brand"><span className="brand-wordmark">Narrately</span><span className="brand-divider">/</span><span className="brand-product">Proof</span></div>
       <div className="nav-label">Workspace</div>
       <a className="nav-item active"><LayoutDashboard/>Overview</a>
       <a className="nav-item" onClick={() => notify("Your saved projects will appear here.")}><FolderClosed/>Projects</a>
@@ -152,7 +152,7 @@ export default function Dashboard() {
     <main className="main">
       <header className="topbar"><div className="crumb">Workspace <span style={{padding:"0 8px",color:"#cbd5e1"}}>/</span> <b>Overview</b></div><div className="top-right"><Search/><CircleHelp/><Bell/></div></header>
       <div className="workspace">
-        <div className="welcome"><div><h1>Good morning, Jordan</h1><p>Here’s what’s happening with your reports.</p></div><button className="button" onClick={() => setModal(true)}><Plus/>New analysis</button></div>
+        <div className="welcome"><div><h1>Your Proof workspace</h1><p>Review claims against source documents, then inspect the evidence behind each finding.</p></div><button className="button" onClick={() => setModal(true)}><Plus/>New analysis</button></div>
         <div className="stats">
           <Stat icon={<FileCheck2/>} label="Reports this month" value="0 / 3" note="3 reports remaining"/>
           <Stat icon={<BookOpenCheck/>} label="Claims verified" value="0" note="Across completed reports"/>
